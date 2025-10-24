@@ -1,0 +1,210 @@
+// Prisma 스키마 파일
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 사용자 모델
+model User {
+  id            String    @id @default(uuid())
+  email         String?   @unique
+  password      String?   // 로컬 로그인용 (bcrypt 해싱)
+  name          String
+  phone         String    // 휴대폰 번호 (필수)
+  profileImage  String?
+  role          Role      @default(EMPLOYEE)
+  isActive      Boolean   @default(true) // 계정 활성화 상태 (false면 로그인 차단)
+  
+  // OAuth 관련
+  provider      AuthProvider @default(LOCAL)
+  providerId    String?   // 카카오 ID, 구글 ID 등
+  
+  // 관계
+  refreshTokens RefreshToken[]
+  storeManagers StoreManager[]
+  applications  Application[]
+  
+  // 타임스탬프
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  @@unique([provider, providerId])
+  @@index([email])
+  @@index([phone])
+}
+
+// 인증 제공자 타입
+enum AuthProvider {
+  LOCAL     // 이메일/비밀번호
+  KAKAO     // 카카오 로그인
+  GOOGLE    // 구글 로그인
+}
+
+// 사용자 역할
+enum Role {
+  ADMIN     // 관리자
+  MANAGER   // 매니저
+  EMPLOYEE  // 아르바이트생
+}
+
+// Refresh Token 관리
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
+
+// 업체/지점 관리
+model Store {
+  id              String    @id @default(uuid())
+  name            String    // 업체명
+  address         String?   // 주소
+  phone           String?   // 연락처
+  description     String?   // 설명
+  
+  // 기본 시급 정보
+  baseHourlyWage  Int       @default(9860) // 기본 시급 (2024년 최저시급)
+  
+  // 관계
+  managers        StoreManager[]  // 업체 관리자
+  schedules       Schedule[]      // 근무 일정
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([name])
+}
+
+// 업체 관리자 (다대다 관계)
+model StoreManager {
+  id        String   @id @default(uuid())
+  storeId   String
+  userId    String
+  
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([storeId, userId])
+  @@index([storeId])
+  @@index([userId])
+}
+
+// 근무 일정
+model Schedule {
+  id              String    @id @default(uuid())
+  storeId         String
+  
+  // 일정 정보
+  date            DateTime  // 근무 날짜
+  startTime       String    // 시작 시간 (HH:mm)
+  endTime         String    // 종료 시간 (HH:mm)
+  
+  // 인원 정보
+  requiredCount   Int       @default(1)  // 필요 인원
+  
+  // 시급 정보
+  hourlyWage      Int       // 시급
+  
+  // 메모
+  description     String?   // 업무 설명
+  
+  // 관계
+  store           Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  applications    Application[]  // 신청 목록
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([storeId])
+  @@index([date])
+  @@index([storeId, date])
+}
+
+// 알바 신청
+model Application {
+  id          String    @id @default(uuid())
+  scheduleId  String
+  userId      String
+  
+  // 신청 상태
+  status      ApplicationStatus @default(PENDING)
+  
+  // 메모
+  message     String?   // 신청 메시지
+  rejectReason String?  // 거부 사유
+  
+  // 관계
+  schedule    Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workRecord  WorkRecord?
+  
+  // 처리 정보
+  processedBy String?   // 처리한 관리자 ID
+  processedAt DateTime? // 처리 시간
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([scheduleId, userId])
+  @@index([userId])
+  @@index([scheduleId])
+  @@index([status])
+}
+
+// 신청 상태
+enum ApplicationStatus {
+  PENDING   // 대기중
+  APPROVED  // 승인됨
+  REJECTED  // 거부됨
+  CANCELLED // 취소됨
+}
+
+// 근무 기록
+model WorkRecord {
+  id            String    @id @default(uuid())
+  applicationId String    @unique
+  
+  // 실제 근무 시간
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+  
+  // 급여 정보
+  totalHours      Float?    // 총 근무 시간
+  totalWage       Int?      // 총 급여
+  
+  // 상태
+  status          WorkStatus @default(SCHEDULED)
+  
+  // 메모
+  note            String?
+  
+  // 관계
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([status])
+}
+
+// 근무 상태
+enum WorkStatus {
+  SCHEDULED   // 예정됨
+  IN_PROGRESS // 근무중
+  COMPLETED   // 완료됨
+  ABSENT      // 결근
+}
