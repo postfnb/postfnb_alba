@@ -1,0 +1,16 @@
+name: Deploy Full Application
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-server:
+    uses: ./.github/workflows/deploy-server.yml
+    secrets: inherit
+
+  deploy-client:
+    uses: ./.github/workflows/deploy-client.yml
+    secrets: inherit
+    needs: deploy-server
