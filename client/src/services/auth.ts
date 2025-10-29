@@ -1,7 +1,16 @@
 import api from '../utils/axios';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Vite 환경 변수 타입 정의
+declare global {
+  interface ImportMeta {
+    env: {
+      VITE_API_URL?: string;
+    };
+  }
+}
+
+const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
 
 // 타입 정의
 export interface User {

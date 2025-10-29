@@ -5,25 +5,6 @@ import { storeService, Store } from '../../services/stores';
 import { applicationService } from '../../services/applications';
 import { useAuthStore } from '../../store/authStore';
 
-const statusBadgeClass = (status: string) => {
-  const map: Record<string, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-700',
-    APPROVED: 'bg-green-100 text-green-700',
-    REJECTED: 'bg-red-100 text-red-700',
-    CANCELLED: 'bg-gray-100 text-gray-700',
-  };
-  return map[status] || 'bg-gray-100 text-gray-700';
-};
-
-const statusLabel = (status: string) => {
-  const map: Record<string, string> = {
-    PENDING: '대기중',
-    APPROVED: '승인됨',
-    REJECTED: '거부됨',
-    CANCELLED: '취소됨',
-  };
-  return map[status] || status;
-};
 
 const getStatusCount = (schedule: Schedule, status: string) => {
   if (!schedule.applications) return 0;
@@ -512,10 +493,8 @@ const ApplicationList: React.FC = () => {
                             </div>
                             <div className="space-y-1">
                               {daySchedules.map((schedule) => {
-                                const applications = schedule.applications || [];
                                 const pendingCount = getStatusCount(schedule, 'PENDING');
                                 const approvedCount = getApprovedCountValue(schedule);
-                                const rejectedCount = getStatusCount(schedule, 'REJECTED');
 
                                 const borderClass = approvedCount > 0 ? 'border-green-300' : pendingCount > 0 ? 'border-yellow-300' : 'border-gray-200';
 
